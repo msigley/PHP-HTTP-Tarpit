@@ -2,10 +2,11 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.0.0
+ * Version: 1.0.4
  * Author: Chaoix
  *
  * Change Log:
+ *	-Fixed bug in Random defense selection. (1.0.4)
  *	-Weighted Random defense to use HTTP Tarpit more often. (1.0.2)
  *	-Changed default defense to Random (4). (1.0.1)
  */
