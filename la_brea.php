@@ -4,11 +4,14 @@
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
  * Version: 1.0.0
  * Author: Chaoix
+ *
+ * Change Log:
+ *	-Changed default defense to Random (4). (1.0.1)
  */
  
 //Basic Options
 $random_content_length = 1024; //In characters. Used to fill up the size of the scanner's log files.
-$defense_number = 1; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Random defense for each request.
+$defense_number = 4; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Random defense for each request.
 $debug = false; //Echo messages for testing the script.
 
 function rand_content() {
