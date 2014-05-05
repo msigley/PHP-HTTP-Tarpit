@@ -6,6 +6,7 @@
  * Author: Chaoix
  *
  * Change Log:
+ *	-Weighted Random defense to use HTTP Tarpit more often. (1.0.2)
  *	-Changed default defense to Random (4). (1.0.1)
  */
  
@@ -29,12 +30,15 @@ function rand_content() {
 }
 
 //Randomize defense
-if (4 == $defense_number)
-	$defense_number = rand(1, 3);
+if (4 == $defense_number) {
+	//Weight random selection to use the Tarpit more often
+	$number_sample = array(1, 2, 3, 3, 3, 3);
+	$defense_number = $number_sample[ rand(1, 3) ];
+}
 
 switch ($defense_number) {
+	//Blinding Mode
 	case 1:
-		//Blinding Mode
 		header("HTTP/1.1 200 OK");
 		rand_content();
 		break;
