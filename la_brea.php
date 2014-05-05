@@ -33,7 +33,7 @@ function rand_content() {
 if (4 == $defense_number) {
 	//Weight random selection to use the Tarpit more often
 	$number_sample = array(1, 2, 3, 3, 3, 3);
-	$defense_number = $number_sample[ rand(1, 3) ];
+	$defense_number = $number_sample[ array_rand( $number_sample ) ];
 }
 
 switch ($defense_number) {
