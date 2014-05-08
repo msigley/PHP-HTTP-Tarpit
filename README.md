@@ -9,3 +9,4 @@ Based on research done by Chris John Riley. http://github.com/ChrisJohnRiley/
 Wishlist
 --------
 * Robots.txt file emulation to not punish good web crawlers.
+* Support for dumping contents of random files in a folder for the Blinding Mode defense.
