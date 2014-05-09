@@ -2,10 +2,12 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.1.0
+ * Version: 1.1.2
  * Author: Chaoix
  *
  * Change Log:
+ *	-Improved random content generation. (1.1.2)
+ *	-Fixed bug in Chained Redirection defense (1.1.1)
  *	-Added Chained Redirection defense. (1.1.0)
  *	-Added Unix control characters to the list of prefixes. (1.0.5)
  *	-Added random delay before headers are sent. (1.0.5)
@@ -15,7 +17,7 @@
  */
  
 //Basic Options
-$random_content_length = 1024; //In characters. Used to fill up the size of the scanner's log files.
+$random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
 $defense_number = 5; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Random defense for each request.
 $responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
 $responce_dalay_max = 200;
@@ -33,11 +35,15 @@ function rand_content() {
 						"\x03", //Interupt
 						"\x04", //Logout
 						"\x07", //Beep
-						"\x21" //Communcation Error
+						"\x21", //Communcation Error
+						" | shutdown -r now",
+						//Exploit grep debian bug #736919 for those running out of date software and put grep in an infinite loop
+						"\xe9\x65\n\xab\n",
+						
 						); 
 	echo $random_prefixes[ rand( 0, count($random_prefixes) - 1 ) ];
 	
-	$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";	
+	$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\t\n\r\s";	
 
 	$size = strlen( $chars );
 	for( $i = 0; $i < $random_content_length; $i++ ) {
@@ -102,6 +108,8 @@ switch ($defense_number) {
 	case 2:
 		header("HTTP/1.1 404 Not Found");
 		echo 'HTTP/1.1 404 Not Found';
+		if( rand(0,1) )
+			rand_content();
 		break;
 	
 	//HTTP Tarpit
@@ -127,14 +135,18 @@ switch ($defense_number) {
 	//Endless Redirect
 	case 4:
 		//Down the rabbit hole
-		//Random redirect status
+		if( $times_redirected >= $times_redirected_max )
+			$times_redirected = 0;
 		$times_redirected++;
+		//Random redirect status
 		$redirect_statuses = array('301 Moved Permanently', 
 								'302 Found', 
 								'307 Temporary Redirect'
 								);
 		header('HTTP/1.1 '.$redirect_statuses[ array_rand( $redirect_statuses ) ]);
 		header('Location: ' . self_url() . '/' . rand(1, 1000) * 4242 . $times_redirected . '.html');
+		if( rand(0,1) )
+			rand_content();
 		break;
 		
 }
