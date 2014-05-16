@@ -13,4 +13,6 @@ Wishlist
 * Support for dumping contents of random files in a folder for the Blinding Mode defense.
 * Add file logging for
 	* Comparing against the HTTP W3 Logs.
-	* Checking for Tor exit nodes.
+	* Checking for proxies via:
+		* X-Forwarded-For headers.
+		* Tor exit node DNSBL service.
