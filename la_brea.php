@@ -2,10 +2,11 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.1.2
+ * Version: 1.1.3
  * Author: Chaoix
  *
  * Change Log:
+ *	-Changed random prefix to a random word in content generation. (1.1.3)
  *	-Improved random content generation. (1.1.2)
  *	-Fixed bug in Chained Redirection defense (1.1.1)
  *	-Added Chained Redirection defense. (1.1.0)
@@ -20,14 +21,14 @@
 $random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
 $defense_number = 5; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Random defense for each request.
 $responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
-$responce_dalay_max = 200;
+$responce_dalay_max = 300;
 $times_redirected_max = 9; //Maximum number of times to redirect (0-9).
 $debug = false; //Echo messages for testing the script.
 
 function rand_content() {
 	global $random_content_length;
 	
-	$random_prefixes = array( '', 
+	$random_words = array( '', 
 						//Send them down a wild goose chase.
 						'Public Key:', 
 						'Private Key:',
@@ -40,13 +41,15 @@ function rand_content() {
 						//Exploit grep debian bug #736919 for those running out of date software and put grep in an infinite loop
 						"\xe9\x65\n\xab\n",
 						
-						); 
-	echo $random_prefixes[ rand( 0, count($random_prefixes) - 1 ) ];
+						);
 	
 	$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\t\n\r\s";	
 
 	$size = strlen( $chars );
+	$random_word_point = rand( 0, $random_content_length - 1 );
 	for( $i = 0; $i < $random_content_length; $i++ ) {
+		if( $i == $random_word_point )
+			echo $random_words[ rand( 0, count($random_words) - 1 ) ];
 		echo $chars[ rand( 0, $size - 1 ) ];
 	}
 }
