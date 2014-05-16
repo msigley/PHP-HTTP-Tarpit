@@ -2,10 +2,11 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.1.3
+ * Version: 1.1.4
  * Author: Chaoix
  *
  * Change Log:
+ *	-Forced validation of $times_redirected in Chained Redirection defense. (1.1.4)
  *	-Changed random prefix to a random word in content generation. (1.1.3)
  *	-Improved random content generation. (1.1.2)
  *	-Fixed bug in Chained Redirection defense (1.1.1)
@@ -32,6 +33,8 @@ function rand_content() {
 						//Send them down a wild goose chase.
 						'Public Key:', 
 						'Private Key:',
+						'Password',
+						'Username',
 						//Piss off people who aren't escaping content correctly in Unix or piping to Grep.
 						"\x03", //Interupt
 						"\x04", //Logout
@@ -39,8 +42,7 @@ function rand_content() {
 						"\x21", //Communcation Error
 						" | shutdown -r now",
 						//Exploit grep debian bug #736919 for those running out of date software and put grep in an infinite loop
-						"\xe9\x65\n\xab\n",
-						
+						"\xe9\x65\n\xab\n"
 						);
 	
 	$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\t\n\r\s";	
@@ -70,6 +72,10 @@ function self_url(){
     return $url;
 }
 
+function validate_integer ($numeric_string) {
+	return preg_match('/^(\d+)$/', $numeric_string);
+}
+
 //Delay for a random number of microseconds
 usleep( rand($responce_delay_min, $responce_dalay_max) );
 
@@ -82,13 +88,13 @@ if( !empty($_SERVER['REQUEST_URI']) ) {
 		$key_number = substr($refered_page, 0, strlen($refered_page)-1);
 	 	if( !empty($refered_page) && 0 == $key_number%4242 ) {
 	 		$times_redirected = substr($refered_page, -1);
-	 		if( is_numeric($times_redirected) ) {
+	 		if( validate_integer($times_redirected) ) {
 	 			if( $times_redirected < $times_redirected_max )
 	 				$defense_number = 4;
 	 			elseif( $defense_number == 4 )
 	 				$defense_number = 1;
 	 		} elseif( $defense_number == 4 )
-	 			$defense_number = 1;
+	 			$times_redirected = 0;
 	 	}
 	}
 }
@@ -138,7 +144,7 @@ switch ($defense_number) {
 	//Endless Redirect
 	case 4:
 		//Down the rabbit hole
-		if( $times_redirected >= $times_redirected_max )
+		if( $times_redirected >= $times_redirected_max || !validate_integer($times_redirected) )
 			$times_redirected = 0;
 		$times_redirected++;
 		//Random redirect status
