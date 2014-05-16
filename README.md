@@ -8,5 +8,9 @@ Based on research done by Chris John Riley. http://github.com/ChrisJohnRiley/
 
 Wishlist
 --------
-* Robots.txt file emulation to not punish good web crawlers.
+* ~~Robots.txt file emulation to not punish good web crawlers.~~
+	* This is handled better by hosting an actual robots.txt and creating an exemption in the url rewrite to allow access to it.
 * Support for dumping contents of random files in a folder for the Blinding Mode defense.
+* Add file logging for
+	* Comparing against the HTTP W3 Logs.
+	* Checking for Tor exit nodes.
