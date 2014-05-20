@@ -2,10 +2,13 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.1.4
+ * Version: 1.1.6
  * Author: Chaoix
  *
  * Change Log:
+ *	-Changed default defense to Random by the minute. (1.1.6)
+ *	-Added Random Defense by the minute option. (1.1.6)
+ *	-Replaced rand calls with mt_rand calls to make the script more efficent. (1.1.5)
  *	-Forced validation of $times_redirected in Chained Redirection defense. (1.1.4)
  *	-Changed random prefix to a random word in content generation. (1.1.3)
  *	-Improved random content generation. (1.1.2)
@@ -15,12 +18,12 @@
  *	-Added random delay before headers are sent. (1.0.5)
  *	-Fixed bug in Random defense selection. (1.0.4)
  *	-Weighted Random defense to use HTTP Tarpit more often. (1.0.2)
- *	-Changed default defense to Random (4). (1.0.1)
+ *	-Changed default defense to Random. (1.0.1)
  */
  
 //Basic Options
 $random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
-$defense_number = 5; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Random defense for each request.
+$defense_number = 6; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Random defense for each request, 6 is a Random Defense by the minute.
 $responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
 $responce_dalay_max = 300;
 $times_redirected_max = 9; //Maximum number of times to redirect (0-9).
@@ -48,11 +51,11 @@ function rand_content() {
 	$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\t\n\r\s";	
 
 	$size = strlen( $chars );
-	$random_word_point = rand( 0, $random_content_length - 1 );
+	$random_word_point = mt_rand( 0, $random_content_length - 1 );
 	for( $i = 0; $i < $random_content_length; $i++ ) {
 		if( $i == $random_word_point )
-			echo $random_words[ rand( 0, count($random_words) - 1 ) ];
-		echo $chars[ rand( 0, $size - 1 ) ];
+			echo $random_words[ mt_rand( 0, count($random_words) - 1 ) ];
+		echo $chars[ mt_rand( 0, $size - 1 ) ];
 	}
 }
 
@@ -77,7 +80,7 @@ function validate_integer ($numeric_string) {
 }
 
 //Delay for a random number of microseconds
-usleep( rand($responce_delay_min, $responce_dalay_max) );
+usleep( mt_rand($responce_delay_min, $responce_dalay_max) );
 
 //Enforce Endless Redirection
 $times_redirected = 0;
@@ -102,30 +105,39 @@ if( !empty($_SERVER['REQUEST_URI']) ) {
 //Randomize defense
 if (5 == $defense_number) {
 	//Weight random selection to use the Tarpit more often
-	$number_sample = array(1, 2, 3, 3, 3, 3 , 4);
+	$number_sample = array(1, 2, 3, 3, 3, 3, 4);
 	$defense_number = $number_sample[ array_rand( $number_sample ) ];
+} elseif (6 == $defense_number) {
+	//Randomize defense based on the current minute. This makes the random return of the server harder to identify.
+	mt_srand(date('i'));
+	$defense_number = mt_rand(1, 4);
+	mt_srand();
 }
+
 
 switch ($defense_number) {
 	//Blinding Mode
+	//Add false positives and fill up bot scanners results with junk.
 	case 1:
 		header("HTTP/1.1 200 OK");
 		rand_content();
 		break;
 	
 	//Ninja Mode
+	//Add false negatives to bot scanners results.
 	case 2:
 		header("HTTP/1.1 404 Not Found");
 		echo 'HTTP/1.1 404 Not Found';
-		if( rand(0,1) )
+		if( mt_rand(0,1) )
 			rand_content();
 		break;
 	
 	//HTTP Tarpit
+	//Slows down bot scanners.
 	case 3:
-		$rand_num = rand(0, 3);
+		$rand_num = mt_rand(0, 3);
 		if (3 == $rand_num) {
-			//Ask for unneccessary authentication
+			//Ask for unneccessary authentication.
 			header("HTTP/1.1 401 Not Authorized");
 			header('WWW-Authenticate: realm="My Realm"');
 			echo 'HTTP/1.1 401 Not Authorized'."\n";
@@ -142,6 +154,7 @@ switch ($defense_number) {
 		break;
 	
 	//Endless Redirect
+	//Punishses crawlers that don't respect robots.txt.
 	case 4:
 		//Down the rabbit hole
 		if( $times_redirected >= $times_redirected_max || !validate_integer($times_redirected) )
@@ -153,8 +166,8 @@ switch ($defense_number) {
 								'307 Temporary Redirect'
 								);
 		header('HTTP/1.1 '.$redirect_statuses[ array_rand( $redirect_statuses ) ]);
-		header('Location: ' . self_url() . '/' . rand(1, 1000) * 4242 . $times_redirected . '.html');
-		if( rand(0,1) )
+		header('Location: ' . self_url() . '/' . mt_rand(1, 1000) * 4242 . $times_redirected . '.html');
+		if( mt_rand(0,1) )
 			rand_content();
 		break;
 		
