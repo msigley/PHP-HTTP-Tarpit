@@ -16,3 +16,6 @@ Wishlist
 	* Checking for proxies via:
 		* X-Forwarded-For headers.
 		* Tor exit node DNSBL service.
+* Add abuse reporting support
+	* Using Abuse Contact DB: https://abusix.com/contactdb.html
+	* X-arf format for emails: http://www.x-arf.org/ 
