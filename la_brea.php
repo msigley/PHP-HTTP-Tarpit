@@ -2,10 +2,12 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.1.6
+ * Version: 1.2.1
  * Author: Chaoix
  *
  * Change Log:
+ *	-Fixed Chained Redirection to bounceback requests that don't send HTTP_HOST. (1.2.1)
+ *	-Added bounceback redirect defense. (1.2.0)
  *	-Changed default defense to Random by the minute. (1.1.6)
  *	-Added Random Defense by the minute option. (1.1.6)
  *	-Replaced rand calls with mt_rand calls to make the script more efficent. (1.1.5)
@@ -23,7 +25,7 @@
  
 //Basic Options
 $random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
-$defense_number = 6; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Random defense for each request, 6 is a Random Defense by the minute.
+$defense_number = 7; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
 $responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
 $responce_dalay_max = 300;
 $times_redirected_max = 9; //Maximum number of times to redirect (0-9).
@@ -60,6 +62,9 @@ function rand_content() {
 }
 
 function self_url(){
+	if( empty($_SERVER['HTTP_HOST']) ) //Some bots won't send the HTTP_HOST header
+		return false;
+	
     $url = 'http';
     
     if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || $_SERVER['SERVER_PORT'] == '443')
@@ -73,6 +78,18 @@ function self_url(){
     endif;
 
     return $url;
+}
+
+function remote_redirect_url(){
+	$ports = array( 80, //http
+	443, //https
+	8080, //alt-http
+	8443, //alt-https
+	8888 //common alt-http
+	);
+	
+	//Always use http hoping for https redirection
+	return 'http://' . $_SERVER['REMOTE_ADDR'] . ':' . $ports[ array_rand( $ports ) ];
 }
 
 function validate_integer ($numeric_string) {
@@ -95,7 +112,7 @@ if( !empty($_SERVER['REQUEST_URI']) ) {
 	 			if( $times_redirected < $times_redirected_max )
 	 				$defense_number = 4;
 	 			elseif( $defense_number == 4 )
-	 				$defense_number = 1;
+	 				$defense_number = mt_rand(0,1) ? 5 : 1; //Sometimes end redirection chain with bounceback
 	 		} elseif( $defense_number == 4 )
 	 			$times_redirected = 0;
 	 	}
@@ -103,14 +120,14 @@ if( !empty($_SERVER['REQUEST_URI']) ) {
 }
 
 //Randomize defense
-if (5 == $defense_number) {
+if (6 == $defense_number) {
 	//Weight random selection to use the Tarpit more often
-	$number_sample = array(1, 2, 3, 3, 3, 3, 4);
+	$number_sample = array(1, 2, 3, 3, 3, 3, 3, 4, 5);
 	$defense_number = $number_sample[ array_rand( $number_sample ) ];
-} elseif (6 == $defense_number) {
+} elseif (7 == $defense_number) {
 	//Randomize defense based on the current minute. This makes the random return of the server harder to identify.
 	mt_srand(date('i'));
-	$defense_number = mt_rand(1, 4);
+	$defense_number = mt_rand(1, 5);
 	mt_srand();
 }
 
@@ -160,17 +177,27 @@ switch ($defense_number) {
 		if( $times_redirected >= $times_redirected_max || !validate_integer($times_redirected) )
 			$times_redirected = 0;
 		$times_redirected++;
+		
+		if( $redirect_url = self_url() )
+		$redirect_url .= '/' . mt_rand(1, 1000) * 4242 . $times_redirected . '.html';
+		//no break is intentional
+		
+	//Bounceback Redirect
+	//Throw bot scanner back at itself and hopefully its network hardware
+	case 5:
+		if( empty($redirect_url) )
+			$redirect_url = remote_redirect_url();
+		
 		//Random redirect status
 		$redirect_statuses = array('301 Moved Permanently', 
 								'302 Found', 
 								'307 Temporary Redirect'
 								);
 		header('HTTP/1.1 '.$redirect_statuses[ array_rand( $redirect_statuses ) ]);
-		header('Location: ' . self_url() . '/' . mt_rand(1, 1000) * 4242 . $times_redirected . '.html');
+		header('Location: ' . $redirect_url);
 		if( mt_rand(0,1) )
 			rand_content();
 		break;
-		
 }
 
 die(); //Stop kill php process to reduce resource overhead
