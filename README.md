@@ -26,6 +26,12 @@ Defense Techinques Implemented
 	* Redirects to a randomly generated url many times in succession.
 	* Wastes time of scanners.
 	* Punishes bad web crawlers for not respecting the robots.txt. Looking at you Baidu.
+	* Sometimes ends in Bounceback Redirection (see below).
+* Bounceback Redirection
+	* Returns a 301, 302, or 307 for all requests.
+	* Redirects request back to requesting ip on common http/https ports.
+	* Wastes time of scanners.
+	* Could potentially tie up resources on attackers edge node.
 * Random Defense Selection 
 	* For each request
 	* By the minute
