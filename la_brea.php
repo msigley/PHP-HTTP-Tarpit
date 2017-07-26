@@ -2,10 +2,12 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.2.1
+ * Version: 1.3.1
  * Author: Chaoix
  *
  * Change Log:
+ *  -Added random content-length header to HEAD requests. (1.3.1)
+ *  -Added HEAD request handling to bait vulnerability scanners such as Jorgee (1.3.0)
  *	-Fixed Chained Redirection to bounceback requests that don't send HTTP_HOST. (1.2.1)
  *	-Added bounceback redirect defense. (1.2.0)
  *	-Changed default defense to Random by the minute. (1.1.6)
@@ -25,7 +27,7 @@
  
 //Basic Options
 $random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
-$defense_number = 7; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
+$defense_number = 1; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
 $responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
 $responce_dalay_max = 300;
 $times_redirected_max = 9; //Maximum number of times to redirect (0-9).
@@ -98,6 +100,14 @@ function validate_integer ($numeric_string) {
 
 //Delay for a random number of microseconds
 usleep( mt_rand($responce_delay_min, $responce_dalay_max) );
+
+//Entice vulnerability scanners to actually perform a GET request
+//Most vulnerability scanners, such as Jorgee, immediately follow a 200 responce on a HEAD request with a GET request
+if( 'HEAD' == $_SERVER['REQUEST_METHOD'] ) {
+	header("HTTP/1.1 200 OK");
+	header("Content-Length: " . mt_rand( 0, $random_content_length - 1 ));
+	die();
+}
 
 //Enforce Endless Redirection
 $times_redirected = 0;
