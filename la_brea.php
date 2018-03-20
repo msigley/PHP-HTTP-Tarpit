@@ -2,10 +2,11 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.3.2
+ * Version: 1.3.3
  * Author: Chaoix
  *
  * Change Log:
+ * 	-Fixed $times_redirected_max when using Random defense. (1.3.3)
  *	-Reworked Chained Redirection to work off of query strings. (1.3.2)
  *	-Added random content-length header to HEAD requests. (1.3.1)
  *	-Added HEAD request handling to bait vulnerability scanners such as Jorgee (1.3.0)
@@ -28,7 +29,7 @@
  
 //Basic Options
 $random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
-$defense_number = 7; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
+$defense_number = 6; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
 $responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
 $responce_dalay_max = 300;
 $times_redirected_max = 9; //Maximum number of times to redirect (0-9).
@@ -121,7 +122,7 @@ if( !empty($_SERVER['QUERY_STRING']) ) {
 	 		if( validate_integer($times_redirected) ) {
 	 			if( $times_redirected < $times_redirected_max )
 	 				$defense_number = 4;
-	 			elseif( $defense_number == 4 )
+	 			else
 	 				$defense_number = mt_rand(0,1) ? 5 : 1; //Sometimes end redirection chain with bounceback
 	 		} elseif( $defense_number == 4 )
 	 			$times_redirected = 0;
