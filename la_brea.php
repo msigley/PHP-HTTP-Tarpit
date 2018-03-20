@@ -2,12 +2,13 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.3.1
+ * Version: 1.3.2
  * Author: Chaoix
  *
  * Change Log:
- *  -Added random content-length header to HEAD requests. (1.3.1)
- *  -Added HEAD request handling to bait vulnerability scanners such as Jorgee (1.3.0)
+ *	-Reworked Chained Redirection to work off of query strings. (1.3.2)
+ *	-Added random content-length header to HEAD requests. (1.3.1)
+ *	-Added HEAD request handling to bait vulnerability scanners such as Jorgee (1.3.0)
  *	-Fixed Chained Redirection to bounceback requests that don't send HTTP_HOST. (1.2.1)
  *	-Added bounceback redirect defense. (1.2.0)
  *	-Changed default defense to Random by the minute. (1.1.6)
@@ -27,7 +28,7 @@
  
 //Basic Options
 $random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
-$defense_number = 1; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
+$defense_number = 7; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
 $responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
 $responce_dalay_max = 300;
 $times_redirected_max = 9; //Maximum number of times to redirect (0-9).
@@ -67,19 +68,19 @@ function self_url(){
 	if( empty($_SERVER['HTTP_HOST']) ) //Some bots won't send the HTTP_HOST header
 		return false;
 	
-    $url = 'http';
-    
-    if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || $_SERVER['SERVER_PORT'] == '443')
-        $url .= 's';
+	$url = 'http';
+	
+	if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || $_SERVER['SERVER_PORT'] == '443')
+			$url .= 's';
 
-    $url .= '://';
-    if ($_SERVER['SERVER_PORT'] != '80' && $_SERVER['SERVER_PORT'] != '443'):
-        $url .= $_SERVER['HTTP_HOST'] . ':' . $_SERVER['SERVER_PORT'];
-    else:
-        $url .= $_SERVER['HTTP_HOST'];
-    endif;
+	$url .= '://';
+	if ($_SERVER['SERVER_PORT'] != '80' && $_SERVER['SERVER_PORT'] != '443'):
+			$url .= $_SERVER['HTTP_HOST'] . ':' . $_SERVER['SERVER_PORT'];
+	else:
+			$url .= $_SERVER['HTTP_HOST'];
+	endif;
 
-    return $url;
+	return $url;
 }
 
 function remote_redirect_url(){
@@ -111,10 +112,9 @@ if( 'HEAD' == $_SERVER['REQUEST_METHOD'] ) {
 
 //Enforce Endless Redirection
 $times_redirected = 0;
-if( !empty($_SERVER['REQUEST_URI']) ) {
-	$refered_page = substr($_SERVER['REQUEST_URI'], strripos($_SERVER['REQUEST_URI'], '/')+1);
+if( !empty($_SERVER['QUERY_STRING']) ) {
+	$refered_page = $_SERVER['QUERY_STRING'];
 	if( !empty($refered_page) ) {
-		$refered_page = substr($refered_page, 0, strlen($refered_page)-5);
 		$key_number = substr($refered_page, 0, strlen($refered_page)-1);
 	 	if( !empty($refered_page) && 0 == $key_number%4242 ) {
 	 		$times_redirected = substr($refered_page, -1);
@@ -189,7 +189,7 @@ switch ($defense_number) {
 		$times_redirected++;
 		
 		if( $redirect_url = self_url() )
-		$redirect_url .= '/' . mt_rand(1, 1000) * 4242 . $times_redirected . '.html';
+		$redirect_url .= $_SERVER['PHP_SELF'] . '?' . mt_rand(1, 1000) * 4242 . $times_redirected;
 		//no break is intentional
 		
 	//Bounceback Redirect
