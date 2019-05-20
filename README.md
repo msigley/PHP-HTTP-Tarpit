@@ -47,3 +47,8 @@ Wishlist
 	* Checking for proxies via:
 		* X-Forwarded-For headers.
 		* Tor exit node DNSBL service.
+
+Wordpress Implementation
+------------------------
+I have implemented this tarpit script into a Wordpress security plugin here to help with brute force attacks:
+https://github.com/msigley/WP-Simple-Security
