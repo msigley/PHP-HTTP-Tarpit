@@ -2,10 +2,11 @@
 /* PHP HTTP Tarpit
  * Purpose: Confuse and waste bot scanners time.
  * Use: Url rewrite unwanted bot traffic to this file. It is important you use Url rewrites not redirects as most bots ignore location headers.
- * Version: 1.3.6
+ * Version: 1.3.7
  * Author: Chaoix
  *
  * Change Log:
+ *  -Fixed bugs in random content length. Switched to use of http_response_code(). (1.3.7)
  *	-Randomized length of random content. (1.3.6)
  *	-Increased response delay. (1.3.6)
  *	-Reworked settings to namespaced constants. (1.3.6)
@@ -70,12 +71,14 @@ namespace PHPHTTPTarpit {
 		$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\t\n\r\s";	
 
 		$random_content_length = mt_rand( 0, max_random_content_length - min_random_content_length ) + max_random_content_length;
-		$size = strlen( $chars );
-		$random_word_point = mt_rand( 0, $random_content_length - 1 );
-		for( $i = 0; $i < $random_content_length; $i++ ) {
-			if( $i == $random_word_point )
-				echo $random_words[ mt_rand( 0, count($random_words) - 1 ) ];
-			echo $chars[ mt_rand( 0, $size - 1 ) ];
+		if( $random_content_length > 0 ) {
+			$size = strlen( $chars );
+			$random_word_point = mt_rand( 0, $random_content_length - 1 );
+			for( $i = 0; $i < $random_content_length; $i++ ) {
+				if( $i == $random_word_point )
+					echo $random_words[ mt_rand( 0, count($random_words) - 1 ) ];
+				echo $chars[ mt_rand( 0, $size - 1 ) ];
+			}
 		}
 	}
 
@@ -139,8 +142,8 @@ namespace PHPHTTPTarpit {
 	//Entice vulnerability scanners to actually perform a GET request
 	//Most vulnerability scanners, such as Jorgee, immediately follow a 200 responce on a HEAD request with a GET request
 	if( 'HEAD' == $_SERVER['REQUEST_METHOD'] ) {
-		header("HTTP/1.1 200 OK");
-		header("Content-Length: " . mt_rand( 0, $random_content_length - 1 ));
+		http_response_code( 200 );
+		header("Content-Length: " . mt_rand( 0, max_random_content_length - min_random_content_length ) + max_random_content_length);
 		die();
 	}
 
@@ -181,15 +184,15 @@ namespace PHPHTTPTarpit {
 		//Blinding Mode
 		//Add false positives and fill up bot scanners results with junk.
 		case 1:
-			header("HTTP/1.1 200 OK");
+			http_response_code( 200 );
 			rand_content();
 			break;
 		
 		//Ninja Mode
 		//Add false negatives to bot scanners results.
 		case 2:
-			header("HTTP/1.1 404 Not Found");
-			echo 'HTTP/1.1 404 Not Found';
+			http_response_code( 404 );
+			echo '404 Not Found';
 			if( mt_rand(0,1) )
 				rand_content();
 			break;
@@ -200,16 +203,16 @@ namespace PHPHTTPTarpit {
 			$rand_num = mt_rand(0, 3);
 			if (2 == $rand_num) {
 				//Ask for unneccessary authentication.
-				header("HTTP/1.1 401 Not Authorized");
+				http_response_code( 401 );
 				header('WWW-Authenticate: Basic realm="phpMyAdmin ' . $_SERVER['HTTP_HOST'] . '"');
-				echo 'HTTP/1.1 401 Not Authorized'."\n";
+				echo '401 Not Authorized'."\n";
 				rand_content();
 				break;
 			}
 
 			//Reply with random keep conection open status code.
 			if (!debug) {
-				header("HTTP/1.1 10$rand_num"); 
+				http_response_code( 100 + $rand_num );
 				if(1 == $rand_num)
 					header("Upgrade: HTTP/2.0"); //Ask client to request the page again.
 			} else {
@@ -236,11 +239,8 @@ namespace PHPHTTPTarpit {
 				$redirect_url = remote_redirect_url();
 			
 			//Random redirect status
-			$redirect_statuses = array('301 Moved Permanently', 
-									'302 Found', 
-									'307 Temporary Redirect'
-									);
-			header('HTTP/1.1 '.$redirect_statuses[ array_rand( $redirect_statuses ) ]);
+			$redirect_statuses = array( 301, 302, 307 );
+			http_response_code( $redirect_statuses[ array_rand( $redirect_statuses ) ] );
 			header('Location: ' . $redirect_url);
 			if( mt_rand(0,1) )
 				rand_content();
